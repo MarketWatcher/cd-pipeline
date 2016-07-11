@@ -7,7 +7,7 @@ OLDPWD=`pwd`
 #### Check required parameters
 if [ -z "${COMPOSE_PROJECT_NAME}" ]; then
     echo "COMPOSE_PROJECT_NAME must be set to a correct value"
-	exit(-1)
+	exit -1
 fi
 
 #### Go to service's directory
