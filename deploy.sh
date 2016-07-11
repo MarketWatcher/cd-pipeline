@@ -13,7 +13,8 @@ fi
 #### Go to service's directory
 cd $DIR/../../
 
-#### Configure ecs-cli
+echo "Configuring ecs-cli"
+
 ecs-cli configure \
 	--region us-west-1 \
 	--cluster default \
@@ -26,7 +27,7 @@ if [[ $CONFIGURE_RESULT -ne 0 ]]; then
 	exit $CONFIGURE_RESULT
 fi
 
-#### Check if there's an existing service definition, bring down if found
+echo "Checking if there's an existing service definition, bringing down if necessary"
 ecs-cli ps | grep "\/${COMPOSE_PROJECT_NAME}"
 
 EXISTING_SERVICE_CHECK_RESULT=$?
@@ -41,10 +42,12 @@ if [[ $EXISTING_SERVICE_CHECK_RESULT -eq 0 ]]; then
 		exit $DOWN_RESULT
 	fi
 
+	echo "Sleeping for 30 seconds"
+
 	sleep 30
 fi
 
-#### Bring new service definition up
+echo "Bringing new service definition up"
 ecs-cli compose --file docker-compose.yml service up
 
 UP_RESULT=$?
@@ -53,5 +56,7 @@ if [[ $UP_RESULT -ne 0 ]]; then
 	exit $UP_RESULT
 fi
 
-#### Go back to original directory
+echo "Going back to original directory"
 cd $OLDPWD
+
+echo "Deployment Done"
