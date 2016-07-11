@@ -30,7 +30,7 @@ fi
 ecs-cli ps | grep "\/${COMPOSE_PROJECT_NAME}"
 
 EXISTING_SERVICE_CHECK_RESULT=$?
-if [ $EXISTING_SERVICE_CHECK_RESULT -ne 0 ]; then
+if [ $EXISTING_SERVICE_CHECK_RESULT -e 0 ]; then
 	echo "Same service definition exists in EC2. Bringing service DOWN"
 
 	ecs-cli compose --file docker-compose.yml service down
