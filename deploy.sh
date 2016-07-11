@@ -28,7 +28,7 @@ if [[ $CONFIGURE_RESULT -ne 0 ]]; then
 fi
 
 echo "Checking if there's an existing service definition, bringing down if necessary"
-ecs-cli ps | grep "\/${COMPOSE_PROJECT_NAME}"
+ecs-cli ps | grep "${COMPOSE_PROJECT_NAME}" | grep "RUNNING"
 
 EXISTING_SERVICE_CHECK_RESULT=$?
 if [[ $EXISTING_SERVICE_CHECK_RESULT -eq 0 ]]; then
