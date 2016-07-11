@@ -5,7 +5,7 @@ DIR=`dirname $(readlink -f $0)`
 OLDPWD=`pwd`
 
 #### Check required parameters
-if [ -z "${COMPOSE_PROJECT_NAME}" ]; then
+if [[ -z "${COMPOSE_PROJECT_NAME}" ]]; then
     echo "COMPOSE_PROJECT_NAME must be set to a correct value"
 	exit -1
 fi
@@ -21,7 +21,7 @@ ecs-cli configure \
 	--compose-service-name-prefix ""
 
 CONFIGURE_RESULT=$?
-if [ $CONFIGURE_RESULT -ne 0 ]; then
+if [[ $CONFIGURE_RESULT -ne 0 ]]; then
 	echo "Could not configure ECS CLI"
 	exit $CONFIGURE_RESULT
 fi
@@ -30,7 +30,7 @@ fi
 ecs-cli ps | grep "\/${COMPOSE_PROJECT_NAME}"
 
 EXISTING_SERVICE_CHECK_RESULT=$?
-if [ $EXISTING_SERVICE_CHECK_RESULT -e 0 ]; then
+if [[ $EXISTING_SERVICE_CHECK_RESULT -eq 0 ]]; then
 	echo "Same service definition exists in EC2. Bringing service DOWN"
 
 	ecs-cli compose --file docker-compose.yml service down
@@ -48,7 +48,7 @@ fi
 ecs-cli compose --file docker-compose.yml service up
 
 UP_RESULT=$?
-if [ $UP_RESULT -ne 0 ]; then
+if [[ $UP_RESULT -ne 0 ]]; then
 	echo "Could not bring service UP in ECS"
 	exit $UP_RESULT
 fi
