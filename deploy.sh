@@ -11,7 +11,7 @@ if [ -z "${COMPOSE_PROJECT_NAME}" ]; then
 fi
 
 #### Go to service's directory
-cd $DIR/../
+cd $DIR/../../
 
 #### Configure ecs-cli
 ecs-cli configure \
