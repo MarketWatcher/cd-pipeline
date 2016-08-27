@@ -1,0 +1,80 @@
+#!/bin/bash
+
+set -e
+
+ACCESS_KEY=$AWS_ACCESS_KEY_ID
+SECRET_KEY=$AWS_SECRET_ACCESS_KEY
+REGION="us-west-1"
+CLUSTER=""
+SERVICE_NAME=""
+COMPOSE_FILE=""
+SLEEP_DURATION=30
+
+show_help () {
+       	echo "Usage:"
+       	echo "    -a ACCESS_KEY"
+       	echo "    -s SECRET_ACCESS_KEY"
+       	echo "    -c CLUSTER"
+       	echo "    -n SERVICE_NAME"
+       	echo "    -f DOCKER_COMPOSE_FILE"
+       	echo "Example:"
+       	echo "    $ deploy_to_ecs -c qa -n alert -f /alert-service/docker-compose-qa.yml"
+       	echo ""
+}
+
+while getopts "h?a:s:c:n:f:" opt; do
+    case "$opt" in
+    h|\?)
+        show_help
+        exit 0
+        ;;
+    a)  ACCESS_KEY=$OPTARG
+       	;;
+    s)  SECRET_KEY=$OPTARG
+       	;;
+    c)  CLUSTER=$OPTARG
+       	;;
+    n)  SERVICE_NAME=$OPTARG
+        ;;
+    f)  COMPOSE_FILE=$OPTARG
+        ;;
+    esac
+done
+
+if [[ (-z "${ACCESS_KEY}") || (-z "${SECRET_KEY}") || (-z "${CLUSTER}") || (-z "${SERVICE_NAME}") || (-z "${COMPOSE_FILE}") ]]; then
+       	echo "Missing arguments!"
+       	echo ""
+       	show_help
+       	exit -1
+fi
+
+echo "Configuring ecs-cli"
+
+ecs-cli configure \
+       	--access-key $ACCESS_KEY \
+       	--secret-key $SECRET_KEY \
+       	--region $REGION \
+       	--cluster $CLUSTER \
+       	--compose-project-name-prefix "" \
+       	--compose-service-name-prefix ""
+
+echo "Checking if there's an existing service definition, bringing down if necessary"
+set +e
+ecs-cli ps | grep "${SERVICE_NAME}" | grep "RUNNING"
+
+EXISTING_SERVICE_CHECK_RESULT=$?
+if [[ $EXISTING_SERVICE_CHECK_RESULT -eq 0 ]]; then
+       	set -e
+       	echo "'$SERVICE_NAME' definition exists in ECS. Bringing service DOWN"
+
+       	ecs-cli compose --debug -p "$SERVICE_NAME" -f "$COMPOSE_FILE" service down
+
+       	echo "Sleeping for $SLEEP_DURATION seconds"
+       	sleep $SLEEP_DURATION
+fi
+
+echo "Bringing new service definition up"
+
+ecs-cli compose --debug -p "$SERVICE_NAME" -f "$COMPOSE_FILE" service up
+
+echo "'$SERVICE_NAME' Deployment Done"
