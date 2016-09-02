@@ -56,9 +56,9 @@ ecs-cli configure \
        	--compose-service-name-prefix ""
 
 
-ecs-cli compose -p $SERVICE_NAME -f $COMPOSE_FILE service down > /dev/null 2&>1 || true
+ecs-cli compose -p "$SERVICE_NAME" -f $COMPOSE_FILE service down > /dev/null 2&>1 || true
 
 for i in {1..10}
 do
-       	ecs-cli compose --debug -p $SERVICE_NAME -f $COMPOSE_FILE service up && break || echo "service up failed. Will retry after 5 seconds..." && sleep 5;
+       	ecs-cli compose -p "$SERVICE_NAME" -f $COMPOSE_FILE service up && break || echo "service up failed. Will retry after 5 seconds..." && sleep 5;
 done
