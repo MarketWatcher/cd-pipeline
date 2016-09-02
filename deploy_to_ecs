@@ -1,14 +1,11 @@
 #!/bin/bash
 
-set -e
-
 ACCESS_KEY=$AWS_ACCESS_KEY_ID
 SECRET_KEY=$AWS_SECRET_ACCESS_KEY
 REGION="us-west-1"
 CLUSTER=""
 SERVICE_NAME=""
 COMPOSE_FILE=""
-SLEEP_DURATION=30
 
 show_help () {
        	echo "Usage:"
@@ -48,8 +45,6 @@ if [[ (-z "${ACCESS_KEY}") || (-z "${SECRET_KEY}") || (-z "${CLUSTER}") || (-z "
        	exit -1
 fi
 
-echo "Configuring ecs-cli"
-
 rm $HOME/.ecs/config
 
 ecs-cli configure \
@@ -60,23 +55,10 @@ ecs-cli configure \
        	--compose-project-name-prefix "" \
        	--compose-service-name-prefix ""
 
-echo "Checking if there's an existing service definition, bringing down if necessary"
-set +e
-ecs-cli ps | grep "${SERVICE_NAME}" | grep "RUNNING"
 
-EXISTING_SERVICE_CHECK_RESULT=$?
-if [[ $EXISTING_SERVICE_CHECK_RESULT -eq 0 ]]; then
-       	set -e
-       	echo "'$SERVICE_NAME' definition exists in ECS. Bringing service DOWN"
+ecs-cli compose -p $SERVICE_NAME -f $COMPOSE_FILE service down > /dev/null 2&>1 || true
 
-       	ecs-cli compose --debug -p $SERVICE_NAME -f $COMPOSE_FILE service down
-
-       	echo "Sleeping for $SLEEP_DURATION seconds"
-       	sleep $SLEEP_DURATION
-fi
-
-echo "Bringing new service definition up"
-
-ecs-cli compose --debug -p $SERVICE_NAME -f $COMPOSE_FILE service up
-
-echo "'$SERVICE_NAME' Deployment Done"
+for i in {1..10}
+do
+       	ecs-cli compose --debug -p $SERVICE_NAME -f $COMPOSE_FILE service up && break || echo "service up failed. Will retry after 5 seconds..." && sleep 5;
+done
