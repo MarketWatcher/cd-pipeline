@@ -1,0 +1,880 @@
+<?xml version="1.0" encoding="utf-8"?>
+<cruise xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="cruise-config.xsd" schemaVersion="84">
+  <server artifactsdir="artifacts" siteUrl="http://cd.marketwatcher.tech:8153" secureSiteUrl="https://cd.marketwatcher.tech::8154" commandRepositoryLocation="default" serverId="3fda6de8-f499-4a28-8a45-6aa424d8579f" />
+  <pipelines group="MarketWatcher">
+    <pipeline name="Alert_Service" template="golang">
+      <materials>
+        <git url="https://github.com/MarketWatcher/alert-service.git" />
+      </materials>
+    </pipeline>
+    <pipeline name="QA">
+      <environmentvariables>
+        <variable name="ALERT_SERVICE_URL">
+          <value>http://qa.marketwatcher.tech:10100</value>
+        </variable>
+        <variable name="DATA_INGESTION_URL">
+          <value>http://127.0.0.1:10700</value>
+        </variable>
+        <variable name="KAFKA_CONNECTION_STRING">
+          <value>qa.marketwatcher.tech:9092</value>
+        </variable>
+        <variable name="KAFKA_ZOO_KEEPER">
+          <value>qa.marketwatcher.tech:2181</value>
+        </variable>
+        <variable name="GROUP">
+          <value>qagroup</value>
+        </variable>
+        <variable name="TOPICS">
+          <value>tweets</value>
+        </variable>
+        <variable name="NUM_THREADS">
+          <value>2</value>
+        </variable>
+      </environmentvariables>
+      <materials>
+        <pipeline pipelineName="Alert_Service" stageName="Package" />
+        <pipeline pipelineName="Frontend" stageName="Package" materialName="Frontend" />
+        <pipeline pipelineName="Data_Process" stageName="Package" materialName="Data_Process" />
+        <pipeline pipelineName="Kafka" stageName="Package" materialName="Kafka" />
+        <pipeline pipelineName="Data_Ingestion" stageName="Package" materialName="Data_Ingestion" />
+        <pipeline pipelineName="Haproxy" stageName="Package" materialName="Haproxy" />
+        <pipeline pipelineName="Api_Gateway" stageName="Package" materialName="Api_Gateway" />
+        <git url="https://github.com/MarketWatcher/tests.git" materialName="QA_Tests" />
+      </materials>
+      <stage name="Prepare">
+        <jobs>
+          <job name="Deploy_Frontend">
+            <tasks>
+              <fetchartifact pipeline="Frontend" stage="Package" job="Dockerize" srcdir="frontend">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="frontend">
+                <arg>-c qa</arg>
+                <arg>-n frontend</arg>
+                <arg>-f docker-compose-qa.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Kafka">
+            <tasks>
+              <fetchartifact pipeline="Kafka" stage="Package" job="Dockerize" srcdir="kafka">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="kafka">
+                <arg>-c qa</arg>
+                <arg>-n kafka</arg>
+                <arg>-f docker-compose-qa.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Process">
+            <tasks>
+              <fetchartifact pipeline="Data_Process" stage="Package" job="Dockerize" srcdir="data-process">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="data-process">
+                <arg>-c qa</arg>
+                <arg>-n dataprocess</arg>
+                <arg>-f docker-compose-qa.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Ingestion">
+            <tasks>
+              <fetchartifact pipeline="Data_Ingestion" stage="Package" job="Dockerize" srcdir="data-ingestion">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="data-ingestion">
+                <arg>-c qa</arg>
+                <arg>-n dataingestion</arg>
+                <arg>-f docker-compose-qa.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Alert_Service">
+            <tasks>
+              <fetchartifact pipeline="Alert_Service" stage="Package" job="Dockerize" srcdir="alert-service">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="alert-service">
+                <arg>-c qa</arg>
+                <arg>-n alert</arg>
+                <arg>-f docker-compose-qa.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Api_Gateway">
+            <tasks>
+              <fetchartifact pipeline="Api_Gateway" stage="Package" job="Dockerize" srcdir="api-gateway">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="api-gateway">
+                <arg>-c default</arg>
+                <arg>-n api-gateway</arg>
+                <arg>-f docker-compose-qa.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Haproxy">
+            <tasks>
+              <fetchartifact pipeline="Haproxy" stage="Package" job="Dockerize" srcdir="haproxy">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="haproxy">
+                <arg>-c default</arg>
+                <arg>-n haproxy</arg>
+                <arg>-f docker-compose-qa.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Test">
+        <jobs>
+          <job name="QA_Tests">
+            <tasks>
+              <exec command="alert_api_test">
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Release">
+        <jobs>
+          <job name="Tag_Alert_Service">
+            <tasks>
+              <fetchartifact pipeline="Alert_Service" stage="Package" job="Dockerize" srcdir="alert-service">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="docker">
+                <arg>tag</arg>
+                <arg>thoughtworksturkey/marketwatcher-alert-service:alpha</arg>
+                <arg>thoughtworksturkey/marketwatcher-alert-service:latest</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-alert-service:latest</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="alert-service" />
+            </artifacts>
+          </job>
+          <job name="Tag_Frontend">
+            <tasks>
+              <fetchartifact pipeline="Frontend" stage="Package" job="Dockerize" srcdir="frontend">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="docker">
+                <arg>tag</arg>
+                <arg>thoughtworksturkey/marketwatcher-io:alpha</arg>
+                <arg>thoughtworksturkey/marketwatcher-io:latest</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-io:latest</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="frontend" />
+            </artifacts>
+          </job>
+          <job name="Tag_Data_Process">
+            <tasks>
+              <fetchartifact pipeline="Data_Process" stage="Package" job="Dockerize" srcdir="data-process">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="docker">
+                <arg>tag</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-processor:alpha</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-processor:latest</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-processor:latest</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="data-process" />
+            </artifacts>
+          </job>
+          <job name="Tag_Data_Ingestion">
+            <tasks>
+              <fetchartifact pipeline="Data_Ingestion" stage="Package" job="Dockerize" srcdir="data-ingestion">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="docker">
+                <arg>tag</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-ingestion-service:alpha</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-ingestion-service:latest</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-ingestion-service:latest</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="data-ingestion" />
+            </artifacts>
+          </job>
+          <job name="Tag_Api_Gateway">
+            <tasks>
+              <fetchartifact pipeline="Api_Gateway" stage="Package" job="Dockerize" srcdir="api-gateway">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="docker">
+                <arg>tag</arg>
+                <arg>thoughtworksturkey/marketwatcher-api-gateway:alpha</arg>
+                <arg>thoughtworksturkey/marketwatcher-api-gateway:latest</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-api-gateway:latest</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="api-gateway" />
+            </artifacts>
+          </job>
+          <job name="Pass_Kafka">
+            <tasks>
+              <fetchartifact pipeline="Kafka" stage="Package" job="Dockerize" srcdir="kafka">
+                <runif status="passed" />
+              </fetchartifact>
+            </tasks>
+            <artifacts>
+              <artifact src="kafka" />
+            </artifacts>
+          </job>
+          <job name="Tag_Haproxy">
+            <tasks>
+              <fetchartifact pipeline="Haproxy" stage="Package" job="Dockerize" srcdir="haproxy">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="docker">
+                <arg>tag</arg>
+                <arg>thoughtworksturkey/marketwatcher-loadbalancer:alpha</arg>
+                <arg>thoughtworksturkey/marketwatcher-loadbalancer:latest</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-loadbalancer:latest</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="loadbalancer" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="Production">
+      <environmentvariables>
+        <variable name="KAFKA_ZOO_KEEPER">
+          <value>marketwatcher.tech:2181</value>
+        </variable>
+      </environmentvariables>
+      <materials>
+        <pipeline pipelineName="QA" stageName="Release" />
+      </materials>
+      <stage name="Deploy">
+        <environmentvariables>
+          <variable name="AWS_ACCESS_KEY_ID" secure="true">
+            <encryptedValue></encryptedValue>
+          </variable>
+          <variable name="AWS_SECRET_ACCESS_KEY" secure="true">
+            <encryptedValue></encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="Deploy_Alert_Service">
+            <environmentvariables>
+              <variable name="DATA_INGESTION_URL">
+                <value>http://marketwatcher.tech:10700/init</value>
+              </variable>
+            </environmentvariables>
+            <tasks>
+              <fetchartifact pipeline="Alert_Service/QA" stage="Package" job="Dockerize" srcdir="alert-service">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="alert-service">
+                <arg>-c default</arg>
+                <arg>-n alert</arg>
+                <arg>-f docker-compose.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Frontend">
+            <tasks>
+              <fetchartifact pipeline="Frontend/QA" stage="Package" job="Dockerize" srcdir="frontend">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="frontend">
+                <arg>-c default</arg>
+                <arg>-n frontend</arg>
+                <arg>-f docker-compose.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Kafka">
+            <tasks>
+              <fetchartifact pipeline="Kafka/QA" stage="Package" job="Dockerize" srcdir="kafka">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="kafka">
+                <arg>-c default</arg>
+                <arg>-n kafka</arg>
+                <arg>-f docker-compose.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Process">
+            <tasks>
+              <fetchartifact pipeline="Data_Process/QA" stage="Package" job="Dockerize" srcdir="data-process">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="data-process">
+                <arg>-c default</arg>
+                <arg>-n dataprocess</arg>
+                <arg>-f docker-compose.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Ingestion">
+            <tasks>
+              <fetchartifact pipeline="Data_Ingestion/QA" stage="Package" job="Dockerize" srcdir="data-ingestion">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="data-ingestion">
+                <arg>-c default</arg>
+                <arg>-n dataingestion</arg>
+                <arg>-f docker-compose.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Haproxy">
+            <tasks>
+              <fetchartifact pipeline="Haproxy/QA" stage="Package" job="Dockerize" srcdir="haproxy">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="haproxy">
+                <arg>-c default</arg>
+                <arg>-n haproxy</arg>
+                <arg>-f docker-compose.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Deploy_Api_Gateway">
+            <tasks>
+              <fetchartifact pipeline="Api_Gateway/QA" stage="Package" job="Dockerize" srcdir="api-gateway">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="deploy_to_ecs" workingdir="api-gateway">
+                <arg>-c default</arg>
+                <arg>-n apigateway</arg>
+                <arg>-f docker-compose.yml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="Frontend">
+      <materials>
+        <git url="https://github.com/MarketWatcher/bff.git" />
+      </materials>
+      <stage name="Prepare">
+        <jobs>
+          <job name="Get_Dependencies">
+            <tasks>
+              <exec command="npm">
+                <arg>install</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+          <job name="Static_Analysis">
+            <tasks>
+              <exec command="npm">
+                <arg>run</arg>
+                <arg>lint</arg>
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Developer_Tests">
+        <jobs>
+          <job name="Unit_Test">
+            <tasks>
+              <exec command="npm">
+                <arg>run</arg>
+                <arg>test</arg>
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Package">
+        <jobs>
+          <job name="Dockerize">
+            <tasks>
+              <exec command="npm">
+                <arg>run</arg>
+                <arg>build</arg>
+              </exec>
+              <exec command="sh">
+                <arg>-c</arg>
+                <arg>docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>build</arg>
+                <arg>-t</arg>
+                <arg>thoughtworksturkey/marketwatcher-io:alpha</arg>
+                <arg>.</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-io:alpha</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="docker-compose.yml" dest="frontend" />
+              <artifact src="docker-compose-qa.yml" dest="frontend" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="Data_Ingestion">
+      <materials>
+        <git url="https://github.com/MarketWatcher/data-ingestion-service.git" />
+      </materials>
+      <stage name="Prepare">
+        <jobs>
+          <job name="Activator_Reload">
+            <tasks>
+              <exec command="activator">
+                <arg>reload</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Developer_Tests">
+        <jobs>
+          <job name="Unit_Test">
+            <tasks>
+              <exec command="activator">
+                <arg>test</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Package">
+        <jobs>
+          <job name="Dockerize">
+            <tasks>
+              <exec command="activator">
+                <arg>dist</arg>
+              </exec>
+              <exec command="sh">
+                <arg>-c</arg>
+                <arg>docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>build</arg>
+                <arg>-t</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-ingestion-service:alpha</arg>
+                <arg>.</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-ingestion-service:alpha</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="docker-compose.yml" dest="data-ingestion" />
+              <artifact src="docker-compose-qa.yml" dest="data-ingestion" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="Data_Process">
+      <materials>
+        <git url="https://github.com/MarketWatcher/data-processor.git" />
+      </materials>
+      <stage name="Prepare">
+        <jobs>
+          <job name="Get_Dependencies">
+            <tasks>
+              <exec command="sbt">
+                <arg>reload</arg>
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Developer_Tests">
+        <jobs>
+          <job name="Unit_Test">
+            <tasks>
+              <exec command="sbt">
+                <arg>test</arg>
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Package">
+        <jobs>
+          <job name="Dockerize">
+            <tasks>
+              <exec command="sbt">
+                <arg>assembly</arg>
+              </exec>
+              <exec command="sh">
+                <arg>-c</arg>
+                <arg>docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>build</arg>
+                <arg>-t</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-processor:alpha</arg>
+                <arg>.</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-data-processor:alpha</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="docker-compose.yml" dest="data-process" />
+              <artifact src="docker-compose-qa.yml" dest="data-process" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="Trend_Service">
+      <materials>
+        <git url="https://github.com/MarketWatcher/trend-service.git" />
+      </materials>
+      <stage name="Prepare">
+        <jobs>
+          <job name="Activator_Reload">
+            <tasks>
+              <exec command="activator">
+                <arg>reload</arg>
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Developer_Tests">
+        <jobs>
+          <job name="Unit_Test">
+            <tasks>
+              <exec command="activator">
+                <arg>test</arg>
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Package">
+        <jobs>
+          <job name="Dockerize">
+            <tasks>
+              <exec command="activator">
+                <arg>dist</arg>
+              </exec>
+              <exec command="sh">
+                <arg>-c</arg>
+                <arg>docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>build</arg>
+                <arg>-t</arg>
+                <arg>thoughtworksturkey/marketwatcher-trend-service:alpha</arg>
+                <arg>.</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-trend-service:alpha</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="docker-compose.yml" dest="trend-service" />
+              <artifact src="docker-compose-qa.yml" dest="trend-service" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="Kafka">
+      <materials>
+        <git url="https://github.com/MarketWatcher/kafka.git" />
+      </materials>
+      <stage name="Package">
+        <jobs>
+          <job name="Dockerize">
+            <artifacts>
+              <artifact src="docker-compose.yml" dest="kafka" />
+              <artifact src="docker-compose-qa.yml" dest="kafka" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="Haproxy">
+      <materials>
+        <git url="https://github.com/MarketWatcher/loadbalancer.git" />
+      </materials>
+      <stage name="Package">
+        <jobs>
+          <job name="Dockerize">
+            <tasks>
+              <exec command="sh">
+                <arg>-c</arg>
+                <arg>docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>build</arg>
+                <arg>-t</arg>
+                <arg>thoughtworksturkey/marketwatcher-loadbalancer:alpha</arg>
+                <arg>.</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-loadbalancer:alpha</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="docker-compose.yml" dest="haproxy" />
+              <artifact src="docker-compose-qa.yml" dest="haproxy" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="Api_Gateway">
+      <materials>
+        <git url="https://github.com/MarketWatcher/api-gateway.git" />
+      </materials>
+      <stage name="Prepare">
+        <jobs>
+          <job name="Get_Dependencies">
+            <tasks>
+              <exec command="npm">
+                <arg>install</arg>
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="node_modules" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Package">
+        <jobs>
+          <job name="Dockerize">
+            <tasks>
+              <exec command="sh">
+                <arg>-c</arg>
+                <arg>docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD</arg>
+              </exec>
+              <exec command="docker">
+                <arg>build</arg>
+                <arg>-t</arg>
+                <arg>thoughtworksturkey/marketwatcher-api-gateway:alpha</arg>
+                <arg>.</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-api-gateway:alpha</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="docker-compose.yml" dest="api-gateway" />
+              <artifact src="docker-compose-qa.yml" dest="api-gateway" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+  </pipelines>
+  <templates>
+    <pipeline name="golang">
+      <stage name="Prepare">
+        <jobs>
+          <job name="Get_Dependencies">
+            <tasks>
+              <exec command="go">
+                <arg>get</arg>
+                <arg>-t</arg>
+                <arg>./...</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Developer_Tests">
+        <jobs>
+          <job name="Unit_Test">
+            <environmentvariables>
+              <variable name="CASSANDRA_NODES_TEST">
+                <value>dummy</value>
+              </variable>
+            </environmentvariables>
+            <tasks>
+              <exec command="go">
+                <arg>test</arg>
+                <arg>-test.short</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Package">
+        <jobs>
+          <job name="Dockerize">
+            <tasks>
+              <exec command="go">
+                <arg>build</arg>
+                <arg>-o</arg>
+                <arg>marketwatcher-alert-service</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="sh">
+                <arg>-c</arg>
+                <arg>docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>build</arg>
+                <arg>-t</arg>
+                <arg>thoughtworksturkey/marketwatcher-alert-service:alpha</arg>
+                <arg>.</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="docker">
+                <arg>push</arg>
+                <arg>thoughtworksturkey/marketwatcher-alert-service:alpha</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <artifacts>
+              <artifact src="docker-compose.yml" dest="alert-service" />
+              <artifact src="docker-compose-qa.yml" dest="alert-service" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+  </templates>
+  <environments>
+    <environment name="MAIN">
+      <environmentvariables>
+        <variable name="GOPATH">
+          <value>/var/lib/</value>
+        </variable>
+        <variable name="GOBIN">
+          <value>/var/lib/bin</value>
+        </variable>
+        <variable name="DOCKER_USERNAME" secure="true">
+          <encryptedValue></encryptedValue>
+        </variable>
+        <variable name="DOCKER_PASSWORD" secure="true">
+          <encryptedValue></encryptedValue>
+        </variable>
+        <variable name="AWS_ACCESS_KEY_ID" secure="true">
+          <encryptedValue></encryptedValue>
+        </variable>
+        <variable name="AWS_SECRET_ACCESS_KEY" secure="true">
+          <encryptedValue></encryptedValue>
+        </variable>
+        <variable name="twitterConsumerKey" secure="true">
+          <encryptedValue></encryptedValue>
+        </variable>
+        <variable name="twitterConsumerSecret" secure="true">
+          <encryptedValue></encryptedValue>
+        </variable>
+        <variable name="twitterAccessToken" secure="true">
+          <encryptedValue></encryptedValue>
+        </variable>
+        <variable name="twitterAccessTokenSecret" secure="true">
+          <encryptedValue></encryptedValue>
+        </variable>
+      </environmentvariables>
+      <agents>
+        <physical uuid="ce2efc24-2fd5-4e9f-baf5-1416d5db0a06" />
+      </agents>
+      <pipelines>
+        <pipeline name="Alert_Service" />
+        <pipeline name="Api_Gateway" />
+        <pipeline name="Data_Ingestion" />
+        <pipeline name="Data_Process" />
+        <pipeline name="Frontend" />
+        <pipeline name="Haproxy" />
+        <pipeline name="Kafka" />
+        <pipeline name="Production" />
+        <pipeline name="QA" />
+        <pipeline name="Trend_Service" />
+      </pipelines>
+    </environment>
+  </environments>
+  <agents>
+    <agent hostname="ip-10-0-1-191" ipaddress="127.0.0.1" uuid="ce2efc24-2fd5-4e9f-baf5-1416d5db0a06" />
+  </agents>
+</cruise>
