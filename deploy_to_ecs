@@ -45,6 +45,8 @@ if [[ (-z "${ACCESS_KEY}") || (-z "${SECRET_KEY}") || (-z "${CLUSTER}") || (-z "
        	exit -1
 fi
 
+SERVICE_NAME=`echo $SERVICE_NAME | sed "s/[ _\-]//g"`
+
 rm $HOME/.ecs/config
 
 ecs-cli configure \
