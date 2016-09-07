@@ -57,11 +57,11 @@ ecs-cli configure \
        	--compose-project-name-prefix "" \
        	--compose-service-name-prefix ""
 
-perl -e "print '-' x 80 . \n"
+echo "--------------------------------------------------------------------------------"
 
 ecs-cli compose --debug -p "$SERVICE_NAME" -f $COMPOSE_FILE service down
 
-perl -e "print '-' x 80 . \n"
+echo "--------------------------------------------------------------------------------"
 
 SUCCESS=false
 
