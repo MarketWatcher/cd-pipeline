@@ -70,7 +70,7 @@ do
 	ecs-cli compose -p "$SERVICE_NAME" -f $COMPOSE_FILE service up && $SUCCESS=true && break || echo "service up failed. Will retry after 5 seconds..." && sleep 5;
 done
 
-if [ "$aaa" = true ] ; then
+if [ "$SUCCESS" = true ] ; then
 	echo "Could NOT deploy service..."
 	exit -1
 fi
