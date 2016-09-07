@@ -57,17 +57,17 @@ ecs-cli configure \
        	--compose-project-name-prefix "" \
        	--compose-service-name-prefix ""
 
-perl -e "print '-' x 80;"
+perl -e "print '-' x 80 . \n"
 
-ecs-cli compose -p "$SERVICE_NAME" -f $COMPOSE_FILE service down
+ecs-cli compose --debug -p "$SERVICE_NAME" -f $COMPOSE_FILE service down
 
-perl -e "print '-' x 80;"
+perl -e "print '-' x 80 . \n"
 
 SUCCESS=false
 
 for i in {1..10}
 do
-	ecs-cli compose -p "$SERVICE_NAME" -f $COMPOSE_FILE service up && $SUCCESS=true && break || echo "service up failed. Will retry after 5 seconds..." && sleep 5;
+	ecs-cli compose --debug -p "$SERVICE_NAME" -f $COMPOSE_FILE service up && $SUCCESS=true && break || echo "service up failed. Will retry after 10 seconds..." && sleep 10;
 done
 
 if [ "$SUCCESS" = true ] ; then
